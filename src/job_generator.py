@@ -25,12 +25,12 @@ class JobGenerator:
         if self.stats.elapsed_min <= 0:
             raise ValueError(f"elapsed_min должен быть > 0, получено {self.stats.elapsed_min}")
 
-        ln_lo   = np.log(self.stats.elapsed_min)
-        ln_hi   = np.log(self.stats.elapsed_max)
-        mu_ln   = (ln_lo + ln_hi) / 2
-        sig_ln  = (ln_hi - ln_lo) / 6
-        elapsed = np.exp(truncnorm.rvs(-3.0, 3.0, loc=mu_ln, scale=sig_ln,
-                                       size=n, random_state=self.rng))
+        mu_e    = (self.stats.elapsed_min + self.stats.elapsed_max) / 2
+        sigma_e = (self.stats.elapsed_max - self.stats.elapsed_min) / 6
+        a = (self.stats.elapsed_min - mu_e) / sigma_e
+        b = (self.stats.elapsed_max - mu_e) / sigma_e
+        elapsed = truncnorm.rvs(a, b, loc=mu_e, scale=sigma_e,
+                                size=n, random_state=self.rng)
 
         log_error = self.rng.normal(self.stats.log_error_mu, self.stats.log_error_sigma, size=n)
         log_error = np.clip(log_error, None, self.stats.log_error_clip)
