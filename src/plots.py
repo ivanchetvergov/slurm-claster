@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Автономный анализ варианта UID=50109, sphere.slrm.
-Выходные файлы: plots/elapsed.png, plots/log_error.png
-"""
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -42,12 +38,10 @@ def load_orig(uid: int, job: str) -> pd.DataFrame:
 
 
 def logloss(data: np.ndarray, pdf_fn) -> float:
-    """Отрицательная логправдоподобность на выборке: -1/n Σ log f(xᵢ)."""
     return float(-np.mean(np.log(np.maximum(pdf_fn(data), 1e-300))))
 
 
 def fit_gmm2(data: np.ndarray):
-    """MLE для смеси двух нормальных. Возвращает (w, mu1, s1, mu2, s2)."""
     def neg_ll(p):
         w, mu1, s1, mu2, s2 = p
         if not (0.05 < w < 0.95 and s1 > 0.05 and s2 > 0.05):
@@ -103,64 +97,49 @@ def _set_time_ticks(ax, lo: float, hi: float):
     ax.set_xlabel("Время выполнения")
 
 
-# ── elapsed.png ───────────────────────────────────────────────────────────────
+# ── ax-level drawing functions (reusable) ─────────────────────────────────────
 
-def plot_elapsed(orig: pd.DataFrame, scale: int = 1000):
-    orig_e = orig["ElapsedRaw"].dropna()
-    orig_e = orig_e[orig_e > 0].to_numpy()
-
-    fig, ax_top = plt.subplots(figsize=(10, 5))
-    fig.suptitle("Распределение времени выполнения  (UID=50109, sphere.slrm)", fontsize=13)
-
-    log_orig  = np.log(orig_e)
+def draw_elapsed(ax, orig: pd.DataFrame):
+    e = orig["ElapsedRaw"].dropna()
+    e = e[e > 0].to_numpy()
+    log_orig = np.log(e)
     lo_e, hi_e = log_orig.min(), log_orig.max()
-    bins_orig  = np.linspace(lo_e, hi_e, 40)
-    ctrs_orig  = (bins_orig[:-1] + bins_orig[1:]) / 2
-    mu_e       = float(log_orig.mean())
+    bins = np.linspace(lo_e, hi_e, 40)
+    ctrs = (bins[:-1] + bins[1:]) / 2
+    mu_e = float(log_orig.mean())
 
-    # Усечённое нормальное в log-пространстве (используется в генераторе)
     mu_tn  = (lo_e + hi_e) / 2
     sig_tn = (hi_e - lo_e) / 6
     a_tn   = (lo_e - mu_tn) / sig_tn
     b_tn   = (hi_e - mu_tn) / sig_tn
-    pdf_tn   = sp.truncnorm.pdf(ctrs_orig, a_tn, b_tn, loc=mu_tn, scale=sig_tn)
+    pdf_tn   = sp.truncnorm.pdf(ctrs, a_tn, b_tn, loc=mu_tn, scale=sig_tn)
     ks_tn, _ = sp.kstest(log_orig, sp.truncnorm.cdf, args=(a_tn, b_tn, mu_tn, sig_tn))
     ll_tn    = logloss(log_orig, lambda x: sp.truncnorm.pdf(x, a_tn, b_tn, loc=mu_tn, scale=sig_tn))
 
-    # GMM-2 (только для анализа)
     gw, gmu1, gs1, gmu2, gs2 = fit_gmm2(log_orig)
-    pdf_gmm   = gmm_pdf(ctrs_orig, gw, gmu1, gs1, gmu2, gs2)
+    pdf_gmm   = gmm_pdf(ctrs, gw, gmu1, gs1, gmu2, gs2)
     ks_gmm, _ = sp.kstest(log_orig, lambda x: gmm_cdf(x, gw, gmu1, gs1, gmu2, gs2))
     ll_gmm    = logloss(log_orig, lambda x: gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2))
 
-    ax_top.hist(log_orig, bins=bins_orig, density=True, alpha=0.6,
-                color="steelblue", label=f"Оригинал (n={len(orig_e)})")
-    ax_top.plot(ctrs_orig, pdf_tn, "orange", lw=2.5,
-                label=f"★ Усечённое норм. (генератор)  KS={ks_tn:.3f}  LL={ll_tn:.3f}")
-    ax_top.plot(ctrs_orig, pdf_gmm, "g--", lw=1.5,
-                label=f"GMM-2 (анализ)  KS={ks_gmm:.3f}  LL={ll_gmm:.3f}")
-    _set_time_ticks(ax_top, lo_e, hi_e)
-    ax_top.set_ylabel("Плотность")
-    ax_top.set_title(f"Оригинальные данные  медиана={int(np.exp(mu_e))} с ≈ {np.exp(mu_e)/3600:.1f} ч")
-    ax_top.legend(fontsize=9)
-
-    plt.tight_layout()
-    out = PLOTS_DIR / "elapsed.png"
-    plt.savefig(out, dpi=150)
-    plt.close()
-    print(f"Сохранено → {out}")
+    ax.hist(log_orig, bins=bins, density=True, alpha=0.6,
+            color="steelblue", label=f"Оригинал (n={len(e)})")
+    ax.plot(ctrs, pdf_tn, "orange", lw=2.5,
+            label=f"★ Усечённое норм. (генератор)  KS={ks_tn:.3f}  LL={ll_tn:.3f}")
+    ax.plot(ctrs, pdf_gmm, "g--", lw=1.5,
+            label=f"GMM-2 (анализ)  KS={ks_gmm:.3f}  LL={ll_gmm:.3f}")
+    _set_time_ticks(ax, lo_e, hi_e)
+    ax.set_ylabel("Плотность")
+    ax.set_title(f"Elapsed  медиана={int(np.exp(mu_e))}с ≈ {np.exp(mu_e)/3600:.1f}ч")
+    ax.legend(fontsize=9)
 
 
-# ── log_error.png ─────────────────────────────────────────────────────────────
-
-def plot_log_error(orig: pd.DataFrame):
+def draw_log_error(ax, orig: pd.DataFrame):
     valid   = orig[(orig["ElapsedRaw"] > 0) & (orig["TimelimitRaw"] > 0)]
     log_err = np.log(valid["TimelimitRaw"] * 60 / valid["ElapsedRaw"])
     log_err = log_err[np.isfinite(log_err)].to_numpy()
-
-    lo, hi = np.quantile(log_err, 0.01), np.quantile(log_err, 0.99)
-    data   = log_err.clip(lo, hi)
-    bins   = np.linspace(lo, hi, 35)
+    lo, hi  = np.quantile(log_err, 0.01), np.quantile(log_err, 0.99)
+    data    = log_err.clip(lo, hi)
+    bins    = np.linspace(lo, hi, 35)
 
     norm_params = sp.norm.fit(data)
     ks_n, _     = sp.kstest(data, sp.norm.cdf, args=norm_params)
@@ -169,12 +148,7 @@ def plot_log_error(orig: pd.DataFrame):
     gw, gmu1, gs1, gmu2, gs2 = fit_gmm2(data)
     ks_g, _ = sp.kstest(data, lambda x: gmm_cdf(x, gw, gmu1, gs1, gmu2, gs2))
     ll_g    = logloss(data, lambda x: gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2))
-
     gmm_label = f"GMM-2  {gw:.2f}·N({gmu1:.1f},{gs1:.1f}) + {1-gw:.2f}·N({gmu2:.1f},{gs2:.1f})"
-
-    fig, ax = plt.subplots(figsize=(11, 6))
-    fig.suptitle("Ошибка оценки времени  ln(Timelimit / Elapsed)  (UID=50109, sphere.slrm)",
-                 fontsize=13)
 
     x = np.linspace(lo, hi, 400)
     ax.hist(data, bins=bins, density=True, alpha=0.55, color="steelblue",
@@ -183,15 +157,19 @@ def plot_log_error(orig: pd.DataFrame):
             label=f"★ Лог-нормальное (генератор)  KS={ks_n:.3f}  LL={ll_n:.3f}")
     ax.plot(x, gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2), "g--", lw=1.5, alpha=0.85,
             label=f"{gmm_label}  KS={ks_g:.3f}  LL={ll_g:.3f}")
-
     ax.set_xlabel("ln(Timelimit / Elapsed)")
     ax.set_ylabel("Плотность")
-    ax.set_title(f"Ошибка оценки времени  (генератор: KS={ks_n:.3f}, LL={ll_n:.3f} | "
-                 f"GMM-2: KS={ks_g:.3f}, LL={ll_g:.3f})")
+    ax.set_title(f"Log-error  генератор: KS={ks_n:.3f} LL={ll_n:.3f} | GMM-2: KS={ks_g:.3f} LL={ll_g:.3f}")
     ax.legend(fontsize=8)
 
+
+def plot_original_data(orig: pd.DataFrame):
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 10))
+    fig.suptitle("Оригинальные данные  (UID=50109, sphere.slrm)", fontsize=13)
+    draw_elapsed(ax1, orig)
+    draw_log_error(ax2, orig)
     plt.tight_layout()
-    out = PLOTS_DIR / "log_error.png"
+    out = PLOTS_DIR / "original_data.png"
     plt.savefig(out, dpi=150)
     plt.close()
     print(f"Сохранено → {out}")
@@ -199,14 +177,11 @@ def plot_log_error(orig: pd.DataFrame):
 
 def main():
     args = _parse_args()
-
     orig = load_orig(args.uid, args.job)
     ref = compute_stats(orig)
     print(ref)
-
     PLOTS_DIR.mkdir(exist_ok=True)
-    plot_elapsed(orig, scale=args.scale)
-    plot_log_error(orig)
+    plot_original_data(orig)
 
 
 if __name__ == "__main__":

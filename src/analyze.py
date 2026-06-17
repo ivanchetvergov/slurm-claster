@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from scipy import stats
 from stats_calculator import compute_stats
+from plots import draw_elapsed, draw_log_error
 
 
 def parse_args():
@@ -54,34 +55,12 @@ def _save(fig, path: Path):
 
 # ── original_data.png ─────────────────────────────────────────────────────────
 
-def plot_original_data(orig: pd.DataFrame, mu: float, sigma: float, out: Path):
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
-    fig.suptitle("Оригинальные данные", fontsize=13)
-
-    e = orig["ElapsedRaw"].dropna()
-    e = e[e > 0].to_numpy()
-    log_e = np.log(e)
-    bins = np.linspace(log_e.min(), log_e.max(), 40)
-    ax1.hist(log_e, bins=bins, density=True, alpha=0.7, color="steelblue")
-    ax1.set_xlabel("ln(Elapsed), с")
-    ax1.set_ylabel("Плотность")
-    ax1.set_title(f"Elapsed  (n={len(e)}, медиана={int(np.median(e))}с)")
-
-    valid = orig[(orig["ElapsedRaw"] > 0) & (orig["TimelimitRaw"] > 0)]
-    log_err = np.log(valid["TimelimitRaw"] * 60 / valid["ElapsedRaw"])
-    log_err = log_err[np.isfinite(log_err)].to_numpy()
-    lo, hi  = np.quantile(log_err, 0.01), np.quantile(log_err, 0.99)
-    data = log_err.clip(lo, hi)
-    bins2 = np.linspace(lo, hi, 35)
-    x = np.linspace(lo, hi, 300)
-    ax2.hist(data, bins=bins2, density=True, alpha=0.7, color="steelblue")
-    ax2.plot(x, stats.norm.pdf(x, mu, sigma), "r-", lw=1.5,
-             label=f"N(μ={mu:.2f}, σ={sigma:.2f})")
-    ax2.set_xlabel("ln(Timelimit / Elapsed)")
-    ax2.set_ylabel("Плотность")
-    ax2.set_title("Log-error оценки времени")
-    ax2.legend(fontsize=9)
-
+def plot_original_data(orig: pd.DataFrame, out: Path):
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 10))
+    fig.suptitle("Оригинальные данные  (UID=50109, sphere.slrm)", fontsize=13)
+    draw_elapsed(ax1, orig)
+    draw_log_error(ax2, orig)
+    plt.tight_layout()
     _save(fig, out)
 
 
@@ -280,7 +259,7 @@ def main():
 
     print(f"Загружено из sacct: {len(sim)} записей")
 
-    plot_original_data(orig, mu, sigma, out_dir / "original_data.png")
+    plot_original_data(orig, out_dir / "original_data.png")
     plot_sampled_data(orig, sim, mu, sigma, args.scale, out_dir / "sampled_data.png")
     plot_slurm_analysis(sim, out_dir / "slurm_analysis.png")
 
