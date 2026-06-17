@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import re
 from pathlib import Path
 
 import numpy as np
@@ -110,6 +111,23 @@ def plot_wait_time(ax, sim: pd.DataFrame):
     ax.grid(True, alpha=0.3)
 
 
+def _expand_nodelist(nodelist: str) -> list[str]:
+    nodes = []
+    for part in re.split(r",(?![^\[]*\])", nodelist):
+        m = re.match(r"^(.*?)\[(.+)\]$", part)
+        if m:
+            prefix = m.group(1)
+            for r in m.group(2).split(","):
+                if "-" in r:
+                    a, b = r.split("-")
+                    nodes.extend(f"{prefix}{i}" for i in range(int(a), int(b) + 1))
+                else:
+                    nodes.append(f"{prefix}{r}")
+        else:
+            nodes.append(part)
+    return nodes
+
+
 def plot_gantt(ax, sim: pd.DataFrame):
     valid = sim.dropna(subset=["Start", "End", "NodeList"]).copy()
     valid = valid[valid["Start"] < valid["End"]]
@@ -118,25 +136,33 @@ def plot_gantt(ax, sim: pd.DataFrame):
         ax.set_title("Gantt: нет данных")
         return
 
-    nodes = sorted(valid["NodeList"].unique())
-    node_idx = {n: i for i, n in enumerate(nodes)}
-    cmap = plt.cm.tab20.colors
-    job_color = {jid: i % len(cmap) for i, jid in enumerate(sorted(valid["JobID"].unique()))}
+    cmap = plt.cm.tab10.colors
+    job_ids = sorted(valid["JobID"].unique())
+    job_color = {jid: cmap[i % len(cmap)] for i, jid in enumerate(job_ids)}
 
+    all_nodes = sorted({n for nl in valid["NodeList"] for n in _expand_nodelist(nl)})
+    node_idx = {n: i for i, n in enumerate(all_nodes)}
+
+    seen = set()
     for _, row in valid.iterrows():
-        y = node_idx[row["NodeList"]]
+        jid = row["JobID"]
+        color = job_color[jid]
         start = mdates.date2num(row["Start"])
         end = mdates.date2num(row["End"])
-        ax.barh(y, end - start, left=start, height=0.5,
-                color=cmap[job_color[row["JobID"]]], alpha=0.85)
+        for node in _expand_nodelist(row["NodeList"]):
+            label = jid if jid not in seen else None
+            seen.add(jid)
+            ax.barh(node_idx[node], end - start, left=start, height=0.6,
+                    color=color, alpha=0.85, label=label)
 
-    ax.set_yticks(range(len(nodes)))
-    ax.set_yticklabels(nodes)
+    ax.set_yticks(range(len(all_nodes)))
+    ax.set_yticklabels(all_nodes)
     ax.xaxis_date()
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
     plt.setp(ax.xaxis.get_majorticklabels(), rotation=30, ha="right")
     ax.set_xlabel("Время")
     ax.set_title("Gantt: загрузка нод")
+    ax.legend(title="JobID", fontsize=7, loc="upper left")
 
 
 def main():
