@@ -3,6 +3,9 @@ import pandas as pd
 from dataclasses import dataclass
 
 
+LOG_ERROR_CLIP = 4.5
+
+
 @dataclass
 class JobStats:
     elapsed_min: float
@@ -11,6 +14,7 @@ class JobStats:
     elapsed_std: float
     log_error_mu: float
     log_error_sigma: float
+    log_error_clip: float
     sample_size: int
 
     def __str__(self):
@@ -37,7 +41,7 @@ class StatsCalculator:
         valid = (elapsed > 0) & (timelimit_sec > 0)
         e_valid = elapsed[valid]
         log_errors = np.log(timelimit_sec[valid] / e_valid)
-        log_errors = log_errors[np.isfinite(log_errors) & (log_errors < 4.5)]
+        log_errors = log_errors[np.isfinite(log_errors) & (log_errors < LOG_ERROR_CLIP)]
 
         return JobStats(
             elapsed_min=float(e_valid.min()),
@@ -46,5 +50,6 @@ class StatsCalculator:
             elapsed_std=float(e_valid.std(ddof=1)),
             log_error_mu=float(log_errors.mean()),
             log_error_sigma=float(log_errors.std(ddof=1)),
+            log_error_clip=LOG_ERROR_CLIP,
             sample_size=len(self.df),
         )

@@ -33,17 +33,13 @@ class JobGenerator:
                                 size=n, random_state=self.rng)
 
         log_error = self.rng.normal(self.stats.log_error_mu, self.stats.log_error_sigma, size=n)
+        log_error = np.clip(log_error, None, self.stats.log_error_clip)
         timelimit = elapsed * np.exp(log_error)
         nodes     = self.rng.integers(1, 5, size=n)
 
-        elapsed_s   = np.maximum(1, np.round(elapsed  / self.time_scale).astype(int)).astype(float)
-        timelimit_s = np.maximum(elapsed_s, np.round(timelimit / self.time_scale)).astype(float)
-
-        over = timelimit_s > self.max_seconds
-        if over.any():
-            factor = self.max_seconds / timelimit_s[over]
-            elapsed_s[over]   = np.maximum(1, np.round(elapsed_s[over] * factor))
-            timelimit_s[over] = self.max_seconds
+        elapsed_s   = np.maximum(1, np.round(elapsed  / self.time_scale).astype(int))
+        timelimit_s = np.maximum(elapsed_s, np.round(timelimit / self.time_scale).astype(int))
+        timelimit_s = np.minimum(timelimit_s, self.max_seconds)
 
         return [JobRequest(int(e), int(t), int(nd))
                 for e, t, nd in zip(elapsed_s, timelimit_s, nodes)]
