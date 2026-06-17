@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from data_loader import SlurmDataLoader
-from stats_calculator import StatsCalculator
+from stats_calculator import compute_stats
 from job_generator import JobGenerator
 from script_renderer import ScriptRenderer
 from accounting_collector import AccountingCollector
@@ -20,7 +20,6 @@ def parse_args():
     p.add_argument("--job",       required=True)
     p.add_argument("--n",         required=True, type=int)
     p.add_argument("--partition", default="debug")
-    p.add_argument("--output",    default="output")
     p.add_argument("--seed",      type=int, default=None)
     p.add_argument("--scale",    type=int, default=1,
                    help="делитель для elapsed/timelimit")
@@ -37,7 +36,7 @@ def main():
     df = SlurmDataLoader(args.csv).load().filter(uid=args.uid, job_name=args.job)
 
     print("\n[2/5] Статистика")
-    stats = StatsCalculator(df).compute()
+    stats = compute_stats(df)
     print(stats)
 
     print(f"\n[3/5] Генерация {args.n} заявок")

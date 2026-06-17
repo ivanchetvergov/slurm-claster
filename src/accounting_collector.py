@@ -37,8 +37,6 @@ class AccountingCollector:
              "--format", ",".join(SACCT_FIELDS), "--parsable2", "--noheader"],
             capture_output=True, text=True, check=True,
         )
-        with open(self.output_file, "w") as f:
-            f.write("|".join(SACCT_FIELDS) + "\n")
-            f.write(result.stdout)
+        self.output_file.write_text("|".join(SACCT_FIELDS) + "\n" + result.stdout)
         print(f"Статистика → {self.output_file}")
         return self.output_file

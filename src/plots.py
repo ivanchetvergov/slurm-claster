@@ -15,8 +15,7 @@ import matplotlib.pyplot as plt
 from scipy import stats as sp
 from scipy.optimize import minimize
 
-from stats_calculator import StatsCalculator
-from job_generator import JobGenerator
+from stats_calculator import compute_stats
 from data_loader import SlurmDataLoader
 
 
@@ -106,11 +105,11 @@ def _set_time_ticks(ax, lo: float, hi: float):
 
 # ── elapsed.png ───────────────────────────────────────────────────────────────
 
-def plot_elapsed(orig: pd.DataFrame, ref, gen_elapsed: np.ndarray, scale: int = 1000):
+def plot_elapsed(orig: pd.DataFrame, scale: int = 1000):
     orig_e = orig["ElapsedRaw"].dropna()
     orig_e = orig_e[orig_e > 0].to_numpy()
 
-    fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(10, 8))
+    fig, ax_top = plt.subplots(figsize=(10, 5))
     fig.suptitle("Распределение времени выполнения  (UID=50109, sphere.slrm)", fontsize=13)
 
     log_orig  = np.log(orig_e)
@@ -144,25 +143,6 @@ def plot_elapsed(orig: pd.DataFrame, ref, gen_elapsed: np.ndarray, scale: int = 
     ax_top.set_ylabel("Плотность")
     ax_top.set_title(f"Оригинальные данные  медиана={int(np.exp(mu_e))} с ≈ {np.exp(mu_e)/3600:.1f} ч")
     ax_top.legend(fontsize=9)
-
-    # Сравнение: оригинал÷SCALE vs синтетика
-    gen_e_pos = gen_elapsed[gen_elapsed > 0]
-    log_gen   = np.log(gen_e_pos)
-    lo_gen    = lo_e - np.log(scale)
-    hi_gen    = hi_e - np.log(scale)
-    bins_gen  = np.linspace(lo_gen, hi_gen, 40)
-
-    kde_orig = sp.gaussian_kde(log_orig - np.log(scale))
-    ll_cmp   = logloss(log_gen, kde_orig)
-
-    ax_bot.hist(log_orig - np.log(scale), bins=bins_gen, density=True, alpha=0.55,
-                color="steelblue", label=f"Оригинал / {scale} (n={len(orig_e)})")
-    ax_bot.hist(log_gen, bins=bins_gen, density=True, alpha=0.55,
-                color="darkorange", label=f"Синтетика (n={len(gen_e_pos)})")
-    _set_time_ticks(ax_bot, lo_gen, hi_gen)
-    ax_bot.set_ylabel("Плотность")
-    ax_bot.set_title(f"Сравнение: оригинал÷{scale} vs синтетика  LL={ll_cmp:.3f}")
-    ax_bot.legend()
 
     plt.tight_layout()
     out = PLOTS_DIR / "elapsed.png"
@@ -221,15 +201,11 @@ def main():
     args = _parse_args()
 
     orig = load_orig(args.uid, args.job)
-    ref  = StatsCalculator(orig).compute()
+    ref = compute_stats(orig)
     print(ref)
 
-    gen      = JobGenerator(ref, seed=args.seed, time_scale=args.scale)
-    requests = gen.generate(args.n)
-    gen_e    = np.array([r.elapsed_sec for r in requests], dtype=float)
-
     PLOTS_DIR.mkdir(exist_ok=True)
-    plot_elapsed(orig, ref, gen_e, scale=args.scale)
+    plot_elapsed(orig, scale=args.scale)
     plot_log_error(orig)
 
 

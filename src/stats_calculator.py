@@ -26,30 +26,25 @@ class JobStats:
         )
 
 
-class StatsCalculator:
+def compute_stats(df: pd.DataFrame) -> JobStats:
+    elapsed = pd.to_numeric(df["ElapsedRaw"], errors="coerce")
+    timelimit_sec = pd.to_numeric(df["TimelimitRaw"], errors="coerce") * 60
 
-    def __init__(self, df: pd.DataFrame):
-        self.df = df
+    completed = df["State"] == "COMPLETED"
+    elapsed = elapsed[completed]
+    timelimit_sec = timelimit_sec[completed]
+    valid = (elapsed > 0) & (timelimit_sec > 0)
+    e_valid = elapsed[valid]
+    log_errors = np.log(timelimit_sec[valid] / e_valid)
+    log_errors = log_errors[np.isfinite(log_errors) & (log_errors < LOG_ERROR_CLIP)]
 
-    def compute(self) -> JobStats:
-        elapsed = pd.to_numeric(self.df["ElapsedRaw"], errors="coerce")
-        timelimit_sec = pd.to_numeric(self.df["TimelimitRaw"], errors="coerce") * 60
-
-        completed = self.df["State"] == "COMPLETED"
-        elapsed = elapsed[completed]
-        timelimit_sec = timelimit_sec[completed]
-        valid = (elapsed > 0) & (timelimit_sec > 0)
-        e_valid = elapsed[valid]
-        log_errors = np.log(timelimit_sec[valid] / e_valid)
-        log_errors = log_errors[np.isfinite(log_errors) & (log_errors < LOG_ERROR_CLIP)]
-
-        return JobStats(
-            elapsed_min=float(e_valid.min()),
-            elapsed_max=float(e_valid.max()),
-            elapsed_mean=float(e_valid.mean()),
-            elapsed_std=float(e_valid.std(ddof=1)),
-            log_error_mu=float(log_errors.mean()),
-            log_error_sigma=float(log_errors.std(ddof=1)),
-            log_error_clip=LOG_ERROR_CLIP,
-            sample_size=len(self.df),
-        )
+    return JobStats(
+        elapsed_min=float(e_valid.min()),
+        elapsed_max=float(e_valid.max()),
+        elapsed_mean=float(e_valid.mean()),
+        elapsed_std=float(e_valid.std(ddof=1)),
+        log_error_mu=float(log_errors.mean()),
+        log_error_sigma=float(log_errors.std(ddof=1)),
+        log_error_clip=LOG_ERROR_CLIP,
+        sample_size=len(df),
+    )

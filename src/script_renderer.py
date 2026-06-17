@@ -17,7 +17,7 @@ class ScriptRenderer:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.partition = partition
-        env = Environment(loader=FileSystemLoader(str(template_dir)), trim_blocks=True, lstrip_blocks=True)
+        env = Environment(loader=FileSystemLoader(template_dir), trim_blocks=True, lstrip_blocks=True)
         self.template = env.get_template("job.sh.j2")
 
     def render(self, job_id: int, request: JobRequest) -> Path:
@@ -33,7 +33,6 @@ class ScriptRenderer:
         return path
 
     def submit(self, script_path: Path) -> str:
-        """Submits script and returns the assigned job ID."""
         result = subprocess.run(
             ["sbatch", str(script_path)],
             capture_output=True, text=True, check=True,

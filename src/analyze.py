@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from scipy import stats
-from stats_calculator import StatsCalculator
+from stats_calculator import compute_stats
 
 
 def parse_args():
@@ -144,7 +144,7 @@ def main():
 
     sim = load_sacct(Path(args.sacct))
     orig = load_subsample(Path(args.subsample))
-    ref = StatsCalculator(orig).compute()
+    ref = compute_stats(orig)
     mu, sigma = ref.log_error_mu, ref.log_error_sigma
 
     print(f"Загружено из sacct: {len(sim)} записей")

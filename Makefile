@@ -71,8 +71,7 @@ collect:
 import sys; sys.path.insert(0,'src'); \
 from accounting_collector import AccountingCollector; \
 ids = open('$(JOBIDS)').read().split(); \
-AccountingCollector('$(SACCT)').wait(ids); \
-AccountingCollector('$(SACCT)').collect(ids)"
+ac = AccountingCollector('$(SACCT)'); ac.wait(ids); ac.collect(ids)"
 
 show-scripts:
 	@ls -lh $(SCRIPTS)/job_*.sh 2>/dev/null || echo "Нет скриптов в $(SCRIPTS)/"
