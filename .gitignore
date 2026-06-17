@@ -1,12 +1,8 @@
 # Сгенерированные скрипты и логи
 scripts/
 output/
-slurm_results/
 run.log
 nohup.out
-
-# Результаты
-plots/*.png
 
 # Python
 __pycache__/
