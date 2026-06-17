@@ -9,6 +9,7 @@ MAX_TIME = 3600
 CSV     = data/acct_0921-0923.csv
 CLEARED = data/cleared_$(UID)_$(JOB).csv
 SACCT   = output/sacct_results.csv
+JOBIDS  = output/job_ids.txt
 SCRIPTS = scripts
 
 _PY_BASE = python3 src/main.py \
@@ -18,7 +19,7 @@ _PY_BASE = python3 src/main.py \
 PY       = $(_PY_BASE) --csv $(CLEARED)
 PY_FULL  = $(_PY_BASE) --csv $(CSV)
 
-.PHONY: dry dry-full run run-full submit show-scripts plots analyze clean clean-scripts clean-plots clean-results help
+.PHONY: dry dry-full run run-full submit collect show-scripts plots analyze clean clean-scripts clean-plots clean-results help
 
 help:
 	@echo "Цели:"
@@ -27,6 +28,7 @@ help:
 	@echo "  run            — полный запуск на очищенных данных"
 	@echo "  run-full       — полный запуск на полных данных"
 	@echo "  submit         — отправить уже сгенерированные скрипты через sbatch"
+	@echo "  collect        — дождаться и собрать sacct после make submit"
 	@echo "  show-scripts   — показать список сгенерированных скриптов"
 	@echo "  plots          — графики по оригинальным данным"
 	@echo "  analyze        — графики по результатам sacct"
@@ -59,7 +61,18 @@ run-full:
 submit:
 	@scripts=$$(ls $(SCRIPTS)/job_*.sh 2>/dev/null); \
 	[ -z "$$scripts" ] && echo "Нет скриптов в $(SCRIPTS)/" && exit 1; \
-	for s in $$scripts; do sbatch $$s; done
+	mkdir -p output; rm -f $(JOBIDS); \
+	for s in $$scripts; do sbatch $$s | awk '{print $$NF}' | tee -a $(JOBIDS); done; \
+	echo "Job IDs → $(JOBIDS)"
+
+collect:
+	@[ -f $(JOBIDS) ] || (echo "Нет $(JOBIDS) — сначала запусти make submit" && exit 1)
+	python3 -c "\
+import sys; sys.path.insert(0,'src'); \
+from accounting_collector import AccountingCollector; \
+ids = open('$(JOBIDS)').read().split(); \
+AccountingCollector('$(SACCT)').wait(ids); \
+AccountingCollector('$(SACCT)').collect(ids)"
 
 show-scripts:
 	@ls -lh $(SCRIPTS)/job_*.sh 2>/dev/null || echo "Нет скриптов в $(SCRIPTS)/"
@@ -79,7 +92,7 @@ $(SACCT):
 	@echo "Нет $(SACCT) — сначала запусти 'make run'" && exit 1
 
 clean-scripts:
-	rm -f $(SCRIPTS)/job_*.sh
+	rm -f $(SCRIPTS)/job_*.sh $(JOBIDS)
 
 clean-plots:
 	rm -f plots/*.png
