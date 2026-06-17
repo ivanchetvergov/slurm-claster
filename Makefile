@@ -18,7 +18,7 @@ _PY_BASE = python3 src/main.py \
 PY       = $(_PY_BASE) --csv $(CLEARED)
 PY_FULL  = $(_PY_BASE) --csv $(CSV)
 
-.PHONY: dry dry-full run run-full plots analyze clean clean-scripts clean-plots clean-results help
+.PHONY: dry dry-full run run-full submit show-scripts plots analyze clean clean-scripts clean-plots clean-results help
 
 help:
 	@echo "Цели:"
@@ -26,6 +26,8 @@ help:
 	@echo "  dry-full       — dry-run на полных данных ($(CSV))"
 	@echo "  run            — полный запуск на очищенных данных"
 	@echo "  run-full       — полный запуск на полных данных"
+	@echo "  submit         — отправить уже сгенерированные скрипты через sbatch"
+	@echo "  show-scripts   — показать список сгенерированных скриптов"
 	@echo "  plots          — графики по оригинальным данным"
 	@echo "  analyze        — графики по результатам sacct"
 	@echo "  clean-scripts  — удалить сгенерированные job_*.sh"
@@ -53,6 +55,14 @@ run: $(CLEARED)
 run-full:
 	nohup $(PY_FULL) > run.log 2>&1 & echo "PID: $$!"
 	@echo "Лог: run.log"
+
+submit:
+	@scripts=$$(ls $(SCRIPTS)/job_*.sh 2>/dev/null); \
+	[ -z "$$scripts" ] && echo "Нет скриптов в $(SCRIPTS)/" && exit 1; \
+	for s in $$scripts; do sbatch $$s; done
+
+show-scripts:
+	@ls -lh $(SCRIPTS)/job_*.sh 2>/dev/null || echo "Нет скриптов в $(SCRIPTS)/"
 
 plots: $(CLEARED)
 	python3 src/plots.py --uid $(UID) --job $(JOB) --scale $(SCALE) --n $(N) --seed $(SEED)
