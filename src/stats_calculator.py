@@ -31,6 +31,9 @@ class StatsCalculator:
         elapsed = pd.to_numeric(self.df["ElapsedRaw"], errors="coerce")
         timelimit_sec = pd.to_numeric(self.df["TimelimitRaw"], errors="coerce") * 60
 
+        completed = self.df["State"] == "COMPLETED"
+        elapsed = elapsed[completed]
+        timelimit_sec = timelimit_sec[completed]
         valid = (elapsed > 0) & (timelimit_sec > 0)
         e_valid = elapsed[valid]
         log_errors = np.log(timelimit_sec[valid] / e_valid)
