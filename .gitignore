@@ -1,0 +1,18 @@
+# Сгенерированные скрипты и логи
+src/output/
+run.log
+nohup.out
+
+# Результаты
+plots/*.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# OS
+.DS_Store
+data/acct_0921-0923.csv
