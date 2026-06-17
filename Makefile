@@ -90,7 +90,7 @@ analyze:
 	@[ -z "$(LATEST)" ] && echo "Нет файлов в $(RESULTS)/ — сначала запусти make run/collect" && exit 1 || true
 	python3 src/analyze.py \
 	    --sacct $(LATEST) --subsample $(CLEARED) \
-	    --scale $(SCALE) --output plots/analysis.png
+	    --scale $(SCALE) --output-dir plots
 
 clean-scripts:
 	rm -f $(SCRIPTS)/job_*.sh $(JOBIDS)
