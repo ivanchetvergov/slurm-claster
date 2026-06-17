@@ -106,7 +106,7 @@ def draw_elapsed(ax, orig: pd.DataFrame):
     lo_e, hi_e = log_orig.min(), log_orig.max()
     bins = np.linspace(lo_e, hi_e, 40)
     ctrs = (bins[:-1] + bins[1:]) / 2
-    mu_e = float(log_orig.mean())
+    median_h = np.exp(float(log_orig.mean())) / 3600
 
     mu_tn  = (lo_e + hi_e) / 2
     sig_tn = (hi_e - lo_e) / 6
@@ -121,16 +121,16 @@ def draw_elapsed(ax, orig: pd.DataFrame):
     ks_gmm, _ = sp.kstest(log_orig, lambda x: gmm_cdf(x, gw, gmu1, gs1, gmu2, gs2))
     ll_gmm    = logloss(log_orig, lambda x: gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2))
 
-    ax.hist(log_orig, bins=bins, density=True, alpha=0.6,
-            color="steelblue", label=f"Оригинал (n={len(e)})")
-    ax.plot(ctrs, pdf_tn, "orange", lw=2.5,
-            label=f"★ Усечённое норм. (генератор)  KS={ks_tn:.3f}  LL={ll_tn:.3f}")
+    ax.hist(log_orig, bins=bins, density=True, alpha=0.6, color="steelblue",
+            label=f"данные  n={len(e)}")
+    ax.plot(ctrs, pdf_tn, "orange", lw=2,
+            label=f"усечённое норм. ★  KS={ks_tn:.3f}  LL={ll_tn:.3f}")
     ax.plot(ctrs, pdf_gmm, "g--", lw=1.5,
-            label=f"GMM-2 (анализ)  KS={ks_gmm:.3f}  LL={ll_gmm:.3f}")
+            label=f"GMM-2  KS={ks_gmm:.3f}  LL={ll_gmm:.3f}")
     _set_time_ticks(ax, lo_e, hi_e)
     ax.set_ylabel("Плотность")
-    ax.set_title(f"Elapsed  медиана={int(np.exp(mu_e))}с ≈ {np.exp(mu_e)/3600:.1f}ч")
-    ax.legend(fontsize=9)
+    ax.set_title(f"Фактическое время выполнения  (лог. шкала, медиана ≈ {median_h:.1f} ч)")
+    ax.legend(fontsize=9, framealpha=0.8)
 
 
 def draw_log_error(ax, orig: pd.DataFrame):
@@ -148,19 +148,18 @@ def draw_log_error(ax, orig: pd.DataFrame):
     gw, gmu1, gs1, gmu2, gs2 = fit_gmm2(data)
     ks_g, _ = sp.kstest(data, lambda x: gmm_cdf(x, gw, gmu1, gs1, gmu2, gs2))
     ll_g    = logloss(data, lambda x: gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2))
-    gmm_label = f"GMM-2  {gw:.2f}·N({gmu1:.1f},{gs1:.1f}) + {1-gw:.2f}·N({gmu2:.1f},{gs2:.1f})"
 
     x = np.linspace(lo, hi, 400)
     ax.hist(data, bins=bins, density=True, alpha=0.55, color="steelblue",
-            label=f"Данные (n={len(data)})")
-    ax.plot(x, sp.norm.pdf(x, *norm_params), "orange", lw=2.5,
-            label=f"★ Лог-нормальное (генератор)  KS={ks_n:.3f}  LL={ll_n:.3f}")
+            label=f"данные  n={len(data)}")
+    ax.plot(x, sp.norm.pdf(x, *norm_params), "orange", lw=2,
+            label=f"N(μ={norm_params[0]:.2f}, σ={norm_params[1]:.2f}) ★  KS={ks_n:.3f}  LL={ll_n:.3f}")
     ax.plot(x, gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2), "g--", lw=1.5, alpha=0.85,
-            label=f"{gmm_label}  KS={ks_g:.3f}  LL={ll_g:.3f}")
+            label=f"GMM-2: {gw:.2f}·N({gmu1:.1f},{gs1:.1f}) + {1-gw:.2f}·N({gmu2:.1f},{gs2:.1f})  KS={ks_g:.3f}  LL={ll_g:.3f}")
     ax.set_xlabel("ln(Timelimit / Elapsed)")
     ax.set_ylabel("Плотность")
-    ax.set_title(f"Log-error  генератор: KS={ks_n:.3f} LL={ll_n:.3f} | GMM-2: KS={ks_g:.3f} LL={ll_g:.3f}")
-    ax.legend(fontsize=8)
+    ax.set_title("Логарифм ошибки оценки времени  ln(timelimit / elapsed)")
+    ax.legend(fontsize=8, framealpha=0.8)
 
 
 def plot_original_data(orig: pd.DataFrame):
