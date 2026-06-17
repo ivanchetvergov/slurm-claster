@@ -8,8 +8,8 @@ MAX_TIME = 3600
 
 CSV     = data/acct_0921-0923.csv
 CLEARED = data/cleared_$(UID)_$(JOB).csv
-SACCT   = src/output/sacct_results.csv
-SCRIPTS = src/output
+SACCT   = output/sacct_results.csv
+SCRIPTS = scripts
 
 _PY_BASE = python3 src/main.py \
      --uid $(UID) --job $(JOB) \
@@ -79,7 +79,7 @@ $(SACCT):
 	@echo "Нет $(SACCT) — сначала запусти 'make run'" && exit 1
 
 clean-scripts:
-	rm -f $(SCRIPTS)/job_*.sh $(SCRIPTS)/job_*.out
+	rm -f $(SCRIPTS)/job_*.sh
 
 clean-plots:
 	rm -f plots/*.png

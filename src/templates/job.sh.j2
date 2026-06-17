@@ -4,7 +4,7 @@
 #SBATCH --nodes={{ nodes }}
 #SBATCH --ntasks={{ nodes }}
 #SBATCH --time={{ timelimit_str }}
-#SBATCH --output={{ output_dir }}/job_%j.out
-#SBATCH --input=/dev/null
+#SBATCH --output=/dev/null
+#SBATCH --error=/dev/null
 
 sleep {{ elapsed_sec }}

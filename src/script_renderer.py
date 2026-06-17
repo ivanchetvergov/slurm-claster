@@ -27,7 +27,6 @@ class ScriptRenderer:
             elapsed_sec=request.elapsed_sec,
             timelimit_str=_slurm_time(request.timelimit_sec),
             nodes=request.nodes,
-            output_dir=str(self.output_dir),
         )
         path = self.output_dir / f"job_{job_id:04d}.sh"
         path.write_text(content)

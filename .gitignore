@@ -1,5 +1,6 @@
 # Сгенерированные скрипты и логи
-src/output/
+scripts/
+output/
 run.log
 nohup.out
 

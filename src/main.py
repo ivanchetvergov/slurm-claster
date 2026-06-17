@@ -43,14 +43,15 @@ def main():
     print(f"\n[3/5] Генерация {args.n} заявок")
     requests = JobGenerator(stats, seed=args.seed, time_scale=args.scale, max_seconds=args.max_time).generate(args.n)
 
-    output_dir = BASE_DIR / args.output
+    scripts_dir = BASE_DIR.parent / "scripts"
+    output_dir  = BASE_DIR.parent / "output"
     renderer = ScriptRenderer(
         template_dir=BASE_DIR / "templates",
-        output_dir=output_dir,
+        output_dir=scripts_dir,
         partition=args.partition,
     )
 
-    print(f"\n[4/5] Скрипты → {output_dir}")
+    print(f"\n[4/5] Скрипты → {scripts_dir}")
     job_ids = []
     for i, req in enumerate(requests, start=1):
         script = renderer.render(job_id=i, request=req)
@@ -67,6 +68,7 @@ def main():
         return
 
     print("\n[5/5] Сбор статистики")
+    output_dir.mkdir(parents=True, exist_ok=True)
     collector = AccountingCollector(output_dir / "sacct_results.csv")
     collector.wait(job_ids)
     collector.collect(job_ids)
