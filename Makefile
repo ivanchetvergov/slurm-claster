@@ -8,9 +8,9 @@ MAX_TIME = 3600
 
 CSV     = data/acct_0921-0923.csv
 CLEARED = data/cleared_$(UID)_$(JOB).csv
-SACCT   = output/sacct_results.csv
-JOBIDS  = output/job_ids.txt
-SCRIPTS = scripts
+JOBIDS   = output/job_ids.txt
+RESULTS  = slurm_results
+SCRIPTS  = scripts
 
 _PY_BASE = python3 src/main.py \
      --uid $(UID) --job $(JOB) \
@@ -68,10 +68,13 @@ submit:
 collect:
 	@[ -f $(JOBIDS) ] || (echo "Нет $(JOBIDS) — сначала запусти make submit" && exit 1)
 	python3 -c "\
-import sys; sys.path.insert(0,'src'); \
+import sys, datetime; sys.path.insert(0,'src'); \
+from pathlib import Path; \
 from accounting_collector import AccountingCollector; \
 ids = open('$(JOBIDS)').read().split(); \
-ac = AccountingCollector('$(SACCT)'); ac.wait(ids); ac.collect(ids)"
+ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S'); \
+p = Path('$(RESULTS)') / f'sacct_{ts}.csv'; p.parent.mkdir(exist_ok=True); \
+ac = AccountingCollector(p); ac.wait(ids); ac.collect(ids)"
 
 show-scripts:
 	@ls -lh $(SCRIPTS)/job_*.sh 2>/dev/null || echo "Нет скриптов в $(SCRIPTS)/"
@@ -82,13 +85,12 @@ plots: $(CLEARED)
 $(CLEARED):
 	@echo "Нет $(CLEARED) — сначала запусти 'make dry' или 'make run'" && exit 1
 
-analyze: $(SACCT)
+analyze:
+	$(eval LATEST := $(shell ls -t $(RESULTS)/sacct_*.csv 2>/dev/null | head -1))
+	@[ -z "$(LATEST)" ] && echo "Нет файлов в $(RESULTS)/ — сначала запусти make run/collect" && exit 1 || true
 	python3 src/analyze.py \
-	    --sacct $(SACCT) --subsample $(CLEARED) \
+	    --sacct $(LATEST) --subsample $(CLEARED) \
 	    --scale $(SCALE) --output plots/analysis.png
-
-$(SACCT):
-	@echo "Нет $(SACCT) — сначала запусти 'make run'" && exit 1
 
 clean-scripts:
 	rm -f $(SCRIPTS)/job_*.sh $(JOBIDS)
@@ -97,6 +99,6 @@ clean-plots:
 	rm -f plots/*.png
 
 clean-results:
-	rm -f $(SACCT) run.log
+	rm -rf $(RESULTS) run.log
 
 clean: clean-scripts clean-plots clean-results

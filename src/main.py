@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from data_loader import SlurmDataLoader
@@ -67,8 +68,10 @@ def main():
         return
 
     print("\n[5/5] Сбор статистики")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    collector = AccountingCollector(output_dir / "sacct_results.csv")
+    results_dir = BASE_DIR.parent / "slurm_results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    collector = AccountingCollector(results_dir / f"sacct_{ts}.csv")
     collector.wait(job_ids)
     collector.collect(job_ids)
     print("\nГотово.")
