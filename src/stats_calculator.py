@@ -37,7 +37,7 @@ class StatsCalculator:
         valid = (elapsed > 0) & (timelimit_sec > 0)
         e_valid = elapsed[valid]
         log_errors = np.log(timelimit_sec[valid] / e_valid)
-        log_errors = log_errors[np.isfinite(log_errors)]
+        log_errors = log_errors[np.isfinite(log_errors) & (log_errors < 8.0)]
 
         return JobStats(
             elapsed_min=float(e_valid.min()),

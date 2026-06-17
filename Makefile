@@ -1,7 +1,7 @@
 UID    = 50109
 JOB    = sphere.slrm
 N      = 30
-SCALE  = 100
+SCALE  = 1000
 PART   = debug
 SEED   = 42
 
@@ -34,6 +34,10 @@ help:
 	@echo ""
 	@echo "Переменные (можно переопределить):"
 	@echo "  N=$(N)  SCALE=$(SCALE)  PART=$(PART)  SEED=$(SEED)"
+	@echo ""
+	@echo "Примеры:"
+	@echo "  make dry N=5        — сгенерировать 5 скриптов"
+	@echo "  make dry N=100      — сгенерировать 100 скриптов"
 
 dry: $(CLEARED)
 	$(PY) --dry-run
