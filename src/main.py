@@ -22,8 +22,10 @@ def parse_args():
     p.add_argument("--partition", default="debug")
     p.add_argument("--output",    default="output")
     p.add_argument("--seed",      type=int, default=None)
-    p.add_argument("--scale",     type=int, default=1,
-                   help="делитель для elapsed/timelimit (например 10000 для демо на кластере)")
+    p.add_argument("--scale",    type=int, default=1,
+                   help="делитель для elapsed/timelimit")
+    p.add_argument("--max-time", type=int, default=3600,
+                   help="жёсткий потолок timelimit в секундах (по умолчанию 3600)")
     p.add_argument("--dry-run",   action="store_true")
     return p.parse_args()
 
@@ -39,7 +41,7 @@ def main():
     print(stats)
 
     print(f"\n[3/5] Генерация {args.n} заявок")
-    requests = JobGenerator(stats, seed=args.seed, time_scale=args.scale).generate(args.n)
+    requests = JobGenerator(stats, seed=args.seed, time_scale=args.scale, max_seconds=args.max_time).generate(args.n)
 
     output_dir = BASE_DIR / args.output
     renderer = ScriptRenderer(

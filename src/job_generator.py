@@ -13,10 +13,11 @@ class JobRequest:
 
 class JobGenerator:
 
-    def __init__(self, stats: JobStats, seed: int | None = None, time_scale: int = 1):
+    def __init__(self, stats: JobStats, seed: int | None = None, time_scale: int = 1, max_seconds: int = 3600):
         self.stats = stats
         self.rng = np.random.default_rng(seed)
         self.time_scale = max(1, time_scale)
+        self.max_seconds = max_seconds
 
     def generate(self, n: int) -> list[JobRequest]:
         if not 1 <= n <= 999:
@@ -35,8 +36,14 @@ class JobGenerator:
         timelimit = elapsed * np.exp(log_error)
         nodes     = self.rng.integers(1, 5, size=n)
 
-        elapsed_s  = np.maximum(1, np.round(elapsed  / self.time_scale).astype(int))
-        timelimit_s = np.maximum(elapsed_s, np.round(timelimit / self.time_scale).astype(int))
+        elapsed_s   = np.maximum(1, np.round(elapsed  / self.time_scale).astype(int)).astype(float)
+        timelimit_s = np.maximum(elapsed_s, np.round(timelimit / self.time_scale)).astype(float)
+
+        over = timelimit_s > self.max_seconds
+        if over.any():
+            factor = self.max_seconds / timelimit_s[over]
+            elapsed_s[over]   = np.maximum(1, np.round(elapsed_s[over] * factor))
+            timelimit_s[over] = self.max_seconds
 
         return [JobRequest(int(e), int(t), int(nd))
                 for e, t, nd in zip(elapsed_s, timelimit_s, nodes)]

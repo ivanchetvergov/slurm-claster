@@ -1,9 +1,10 @@
 UID    = 50109
 JOB    = sphere.slrm
 N      = 30
-SCALE  = 1000
-PART   = debug
-SEED   = 42
+SCALE    = 1000
+PART     = debug
+SEED     = 42
+MAX_TIME = 3600
 
 CSV     = data/acct_0921-0923.csv
 CLEARED = data/cleared_$(UID)_$(JOB).csv
@@ -12,7 +13,7 @@ SCRIPTS = src/output
 
 _PY_BASE = python3 src/main.py \
      --uid $(UID) --job $(JOB) \
-     --n $(N) --scale $(SCALE) --partition $(PART) --seed $(SEED)
+     --n $(N) --scale $(SCALE) --partition $(PART) --seed $(SEED) --max-time $(MAX_TIME)
 
 PY       = $(_PY_BASE) --csv $(CLEARED)
 PY_FULL  = $(_PY_BASE) --csv $(CSV)
