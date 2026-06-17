@@ -15,4 +15,5 @@ __pycache__/
 
 # OS
 .DS_Store
+.vscode/
 data/acct_0921-0923.csv
