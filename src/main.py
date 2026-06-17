@@ -55,7 +55,8 @@ def main():
     for i, req in enumerate(requests, start=1):
         script = renderer.render(job_id=i, request=req)
         if args.dry_run:
-            print(f"  [{i:03d}] nodes={req.nodes}  elapsed={req.elapsed_sec}s  limit={req.timelimit_sec}s  ({script.name})")
+            coef = req.timelimit_sec / req.elapsed_sec
+            print(f"  [{i:03d}] nodes={req.nodes}  elapsed={req.elapsed_sec}s  limit={req.timelimit_sec}s  coef={coef:.1f}x  ({script.name})")
         else:
             out = renderer.submit(script)
             job_ids.append(out)
