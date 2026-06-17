@@ -1,0 +1,1 @@
+{"buildTargets":[".PHONY","analyze","clean","clean-plots","clean-results","clean-scripts","data/cleared_50109_sphere.slrm.csv","dry","help","plots","run","src/output/sacct_results.csv"],"launchTargets":[],"customConfigurationProvider":{"workspaceBrowse":{"browsePath":[],"compilerArgs":[]},"fileIndex":[]}}

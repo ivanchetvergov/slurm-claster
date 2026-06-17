@@ -1,0 +1,15 @@
+make: Entering directory `/Users/ivan/prog/sum_prac'
+echo "Цели:"
+echo "  dry            — сгенерировать скрипты без отправки"
+echo "  run            — полный запуск (генерация + sbatch + ожидание + sacct)"
+echo "  plots          — графики по оригинальным данным"
+echo "  analyze        — графики по результатам sacct"
+echo "  clean-scripts  — удалить сгенерированные job_*.sh"
+echo "  clean-plots    — удалить plots/*.png"
+echo "  clean-results  — удалить sacct_results.csv"
+echo "  clean          — всё вышеперечисленное"
+echo ""
+echo "Переменные (можно переопределить):"
+echo "  N=30  SCALE=100  PART=debug  SEED=42"
+make: Leaving directory `/Users/ivan/prog/sum_prac'
+ 
