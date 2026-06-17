@@ -10,7 +10,7 @@ CLEARED = data/cleared_$(UID)_$(JOB).csv
 SACCT   = src/output/sacct_results.csv
 SCRIPTS = src/output
 
-_PY_BASE = python src/main.py \
+_PY_BASE = python3 src/main.py \
      --uid $(UID) --job $(JOB) \
      --n $(N) --scale $(SCALE) --partition $(PART) --seed $(SEED)
 
@@ -50,13 +50,13 @@ run-full:
 	@echo "Лог: run.log"
 
 plots: $(CLEARED)
-	python src/plots.py --uid $(UID) --job $(JOB) --scale $(SCALE) --n $(N) --seed $(SEED)
+	python3 src/plots.py --uid $(UID) --job $(JOB) --scale $(SCALE) --n $(N) --seed $(SEED)
 
 $(CLEARED):
 	@echo "Нет $(CLEARED) — сначала запусти 'make dry' или 'make run'" && exit 1
 
 analyze: $(SACCT)
-	python src/analyze.py \
+	python3 src/analyze.py \
 	    --sacct $(SACCT) --subsample $(CLEARED) \
 	    --scale $(SCALE) --output plots/analysis.png
 
