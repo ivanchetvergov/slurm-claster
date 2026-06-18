@@ -1,7 +1,7 @@
 UID    = 50109
 JOB    = sphere.slrm
 N      = 30
-SCALE    = 1000
+SCALE    = 2000
 PART     = debug
 SEED     = 42
 MAX_TIME = 3600

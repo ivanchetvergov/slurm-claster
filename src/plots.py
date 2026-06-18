@@ -11,9 +11,16 @@ import matplotlib.pyplot as plt
 from scipy import stats as sp
 from scipy.optimize import minimize
 
-from stats_calculator import compute_stats
+from stats_calculator import compute_stats, fit_gmm2
 from data_loader import SlurmDataLoader
 
+
+_ORANGE_C = "#e87722"
+
+TIMEOUT_FACTOR_MU    = 2.0   # центр модели недооценки TIMEOUT (в разах)
+TIMEOUT_FACTOR_SIGMA = 1.0   # разброс
+TIMEOUT_FACTOR_LO    = 1.2   # нижняя граница: хотя бы в 1.2 раз недооценили
+TIMEOUT_FACTOR_HI    = 5.0   # верхняя граница
 
 DATA_DIR  = Path(__file__).parent.parent / "data"
 PLOTS_DIR = Path(__file__).parent.parent / "plots"
@@ -41,34 +48,6 @@ def logloss(data: np.ndarray, pdf_fn) -> float:
     return float(-np.mean(np.log(np.maximum(pdf_fn(data), 1e-300))))
 
 
-def fit_gmm2(data: np.ndarray):
-    def neg_ll(p):
-        w, mu1, s1, mu2, s2 = p
-        if not (0.05 < w < 0.95 and s1 > 0.05 and s2 > 0.05):
-            return 1e10
-        pdf = w * sp.norm.pdf(data, mu1, s1) + (1 - w) * sp.norm.pdf(data, mu2, s2)
-        return -np.sum(np.log(np.maximum(pdf, 1e-300)))
-
-    q    = np.percentile(data, [15, 85])
-    span = float(data.std())
-    inits = [
-        [0.5, q[0], span / 3, q[1], span / 3],
-        [0.4, q[0], span / 4, q[1], span / 2],
-        [0.6, q[0], span / 2, q[1], span / 4],
-    ]
-    best = None
-    for x0 in inits:
-        res = minimize(neg_ll, x0, method="Nelder-Mead",
-                       options={"maxiter": 10000, "fatol": 1e-9})
-        if best is None or res.fun < best.fun:
-            best = res
-
-    w, mu1, s1, mu2, s2 = best.x
-    s1, s2 = abs(s1), abs(s2)
-    if mu1 > mu2:
-        w, mu1, s1, mu2, s2 = 1 - w, mu2, s2, mu1, s1
-    return float(w), float(mu1), float(s1), float(mu2), float(s2)
-
 
 def gmm_pdf(x, w, mu1, s1, mu2, s2) -> np.ndarray:
     return w * sp.norm.pdf(x, mu1, s1) + (1 - w) * sp.norm.pdf(x, mu2, s2)
@@ -79,9 +58,15 @@ def gmm_cdf(x, w, mu1, s1, mu2, s2) -> np.ndarray:
 
 
 _TIME_TICKS = [
+    (0.01,      "0.01с"),
+    (0.1,       "0.1с"),
+    (0.5,       "0.5с"),
     (1,         "1с"),
-    (60,        "1мин"),
-    (600,       "10мин"),
+    (5,         "5с"),
+    (30,        "30с"),
+    (60,        "1м"),
+    (300,       "5м"),
+    (600,       "10м"),
     (3_600,     "1ч"),
     (21_600,    "6ч"),
     (86_400,    "1д"),
@@ -94,17 +79,23 @@ def _set_time_ticks(ax, lo: float, hi: float):
     if ticks:
         ax.set_xticks([t for t, _ in ticks])
         ax.set_xticklabels([lbl for _, lbl in ticks])
+    ax.set_xlim(lo - 0.3, hi + 0.3)
     ax.set_xlabel("Время выполнения")
 
 
 # ── ax-level drawing functions (reusable) ─────────────────────────────────────
 
 def draw_elapsed(ax, orig: pd.DataFrame):
-    e = orig["ElapsedRaw"].dropna()
-    e = e[e > 0].to_numpy()
+    mask_c = orig["State"].isin(["COMPLETED"]) & (orig["ElapsedRaw"] > 0)
+    mask_t = orig["State"].isin(["TIMEOUT"])   & (orig["ElapsedRaw"] > 0)
+    e_c = orig.loc[mask_c, "ElapsedRaw"].dropna().to_numpy()
+    e_t = orig.loc[mask_t, "ElapsedRaw"].dropna().to_numpy()
+    e   = np.concatenate([e_c, e_t])
     log_orig = np.log(e)
+    log_c    = np.log(e_c)
+    log_t    = np.log(e_t) if len(e_t) else np.array([])
     lo_e, hi_e = log_orig.min(), log_orig.max()
-    bins = np.linspace(lo_e, hi_e, 40)
+    bins = np.linspace(lo_e, hi_e, 120)
     ctrs = (bins[:-1] + bins[1:]) / 2
     median_h = np.exp(float(log_orig.mean())) / 3600
 
@@ -121,8 +112,13 @@ def draw_elapsed(ax, orig: pd.DataFrame):
     ks_gmm, _ = sp.kstest(log_orig, lambda x: gmm_cdf(x, gw, gmu1, gs1, gmu2, gs2))
     ll_gmm    = logloss(log_orig, lambda x: gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2))
 
-    ax.hist(log_orig, bins=bins, density=True, alpha=0.6, color="steelblue",
-            label=f"данные  n={len(e)}")
+    if len(log_t):
+        ax.hist([log_c, log_t], bins=bins, density=True, stacked=True, alpha=0.6,
+                color=["steelblue", _ORANGE_C],
+                label=[f"COMPLETED  n={len(e_c)}", f"TIMEOUT  n={len(e_t)}"])
+    else:
+        ax.hist(log_c, bins=bins, density=True, alpha=0.6, color="steelblue",
+                label=f"данные  n={len(e_c)}")
     ax.plot(ctrs, pdf_tn, "orange", lw=2,
             label=f"усечённое норм. ★  KS={ks_tn:.3f}  LL={ll_tn:.3f}")
     ax.plot(ctrs, pdf_gmm, "g--", lw=1.5,
@@ -133,13 +129,31 @@ def draw_elapsed(ax, orig: pd.DataFrame):
     ax.legend(fontsize=9, framealpha=0.8)
 
 
+def _timeout_log_errors(n: int) -> np.ndarray:
+    """Импутация log_error для TIMEOUT-задач через модель недооценки.
+
+    factor ~ TruncNorm(mu, sigma) ∈ [LO, HI]  →  log_error = -ln(factor) ∈ [-ln(HI), 0]
+    """
+    a = (TIMEOUT_FACTOR_LO - TIMEOUT_FACTOR_MU) / TIMEOUT_FACTOR_SIGMA
+    b = (TIMEOUT_FACTOR_HI - TIMEOUT_FACTOR_MU) / TIMEOUT_FACTOR_SIGMA
+    factors = sp.truncnorm.rvs(a, b, loc=TIMEOUT_FACTOR_MU, scale=TIMEOUT_FACTOR_SIGMA,
+                               size=n, random_state=42)
+    return -np.log(factors)
+
+
 def draw_log_error(ax, orig: pd.DataFrame):
-    valid   = orig[(orig["ElapsedRaw"] > 0) & (orig["TimelimitRaw"] > 0)]
-    log_err = np.log(valid["TimelimitRaw"] * 60 / valid["ElapsedRaw"])
-    log_err = log_err[np.isfinite(log_err)].to_numpy()
-    lo, hi  = np.quantile(log_err, 0.01), np.quantile(log_err, 0.99)
-    data    = log_err.clip(lo, hi)
-    bins    = np.linspace(lo, hi, 35)
+    valid_mask = (orig["ElapsedRaw"] > 0) & (orig["TimelimitRaw"] > 0)
+    completed  = orig[valid_mask & (orig["State"] == "COMPLETED")]
+    log_err    = np.log(completed["TimelimitRaw"] * 60 / completed["ElapsedRaw"])
+    log_err    = log_err[np.isfinite(log_err)].to_numpy()
+
+    n_completed = len(log_err)
+    n_timeout   = int((orig["State"] == "TIMEOUT").sum())
+    log_err     = np.concatenate([log_err, _timeout_log_errors(n_timeout)])
+
+    lo, hi = log_err.min(), log_err.max()
+    data   = log_err
+    bins   = np.linspace(lo, hi, 50)
 
     norm_params = sp.norm.fit(data)
     ks_n, _     = sp.kstest(data, sp.norm.cdf, args=norm_params)
@@ -149,17 +163,48 @@ def draw_log_error(ax, orig: pd.DataFrame):
     ks_g, _ = sp.kstest(data, lambda x: gmm_cdf(x, gw, gmu1, gs1, gmu2, gs2))
     ll_g    = logloss(data, lambda x: gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2))
 
+    log_err_timeout = _timeout_log_errors(n_timeout)
+    c_clipped = log_err[:n_completed]
+    t_clipped = log_err_timeout
+
     x = np.linspace(lo, hi, 400)
-    ax.hist(data, bins=bins, density=True, alpha=0.55, color="steelblue",
-            label=f"данные  n={len(data)}")
+    ax.hist([c_clipped, t_clipped], bins=bins, density=True, stacked=True, alpha=0.6,
+            color=["steelblue", _ORANGE_C],
+            label=[f"COMPLETED  n={n_completed}", f"TIMEOUT  n={n_timeout} (модель)"])
     ax.plot(x, sp.norm.pdf(x, *norm_params), "orange", lw=2,
             label=f"N(μ={norm_params[0]:.2f}, σ={norm_params[1]:.2f}) ★  KS={ks_n:.3f}  LL={ll_n:.3f}")
     ax.plot(x, gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2), "g--", lw=1.5, alpha=0.85,
             label=f"GMM-2: {gw:.2f}·N({gmu1:.1f},{gs1:.1f}) + {1-gw:.2f}·N({gmu2:.1f},{gs2:.1f})  KS={ks_g:.3f}  LL={ll_g:.3f}")
-    ax.set_xlabel("ln(Timelimit / Elapsed)")
+    ax.set_ylim(0, 0.40)
+    ax.yaxis.set_major_locator(plt.MultipleLocator(0.10))
+    ax.set_xticks(range(int(np.floor(lo)), int(np.ceil(hi)) + 1))
+    ax.set_xlabel("ln(timelimit / elapsed)")
     ax.set_ylabel("Плотность")
     ax.set_title("Логарифм ошибки оценки времени  ln(timelimit / elapsed)")
     ax.legend(fontsize=8, framealpha=0.8)
+
+
+def draw_timeout_model(ax, orig: pd.DataFrame):
+    """Модель недооценки для TIMEOUT: factor = true_elapsed / timelimit ~ TruncNorm ∈ [1, 5]."""
+    n_timeout = int((orig["State"] == "TIMEOUT").sum())
+
+    a = (TIMEOUT_FACTOR_LO - TIMEOUT_FACTOR_MU) / TIMEOUT_FACTOR_SIGMA
+    b = (TIMEOUT_FACTOR_HI - TIMEOUT_FACTOR_MU) / TIMEOUT_FACTOR_SIGMA
+    x = np.linspace(TIMEOUT_FACTOR_LO, TIMEOUT_FACTOR_HI, 300)
+    pdf = sp.truncnorm.pdf(x, a, b, loc=TIMEOUT_FACTOR_MU, scale=TIMEOUT_FACTOR_SIGMA)
+
+    samples = sp.truncnorm.rvs(a, b, loc=TIMEOUT_FACTOR_MU, scale=TIMEOUT_FACTOR_SIGMA,
+                               size=max(n_timeout * 50, 500), random_state=42)
+
+    ax.hist(samples, bins=20, density=True, alpha=0.45, color=_ORANGE_C,
+            label=f"сэмплы  (реальных TIMEOUT: {n_timeout})")
+    ax.plot(x, pdf, color="crimson", lw=2,
+            label=f"TruncNorm(μ={TIMEOUT_FACTOR_MU}, σ={TIMEOUT_FACTOR_SIGMA})  ∈ [1.2, 5]")
+    ax.set_xticks([1.2, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
+    ax.set_xlabel("true_elapsed / timelimit")
+    ax.set_ylabel("Плотность")
+    ax.set_title("Модель недооценки TIMEOUT-задач")
+    ax.legend(fontsize=9, framealpha=0.8)
 
 
 def plot_original_data(orig: pd.DataFrame):
