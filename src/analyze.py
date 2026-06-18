@@ -206,9 +206,45 @@ def plot_sampled_data(orig: pd.DataFrame, sim: pd.DataFrame,
 
 # ── gantt_analysis.png ────────────────────────────────────────────────────────
 
+def _compress_timeline(df: pd.DataFrame, gap_threshold_s: float = 300.0) -> pd.DataFrame:
+    """Вырезает простои > gap_threshold_s и сдвигает последующие задачи влево."""
+    df = df.copy().sort_values("Start")
+    # строим покрытие: когда хоть одна задача работала
+    events = sorted(
+        [(row["Start"], +1, i) for i, row in df.iterrows()] +
+        [(row["End"],   -1, i) for i, row in df.iterrows()]
+    )
+    shift = pd.Timedelta(0)
+    active = 0
+    idle_start = None
+    shifts: list[tuple] = []  # (cutoff_time, shift_delta)
+
+    for ts, delta, _ in events:
+        if active == 0 and delta == +1 and idle_start is not None:
+            gap = (ts - idle_start).total_seconds()
+            if gap > gap_threshold_s:
+                shift += pd.Timedelta(seconds=gap)
+                shifts.append((ts, shift))
+        active += delta
+        if active == 0:
+            idle_start = ts
+
+    def apply_shift(t):
+        s = pd.Timedelta(0)
+        for cutoff, total in shifts:
+            if t >= cutoff:
+                s = total
+        return t - s
+
+    df["Start"] = df["Start"].apply(apply_shift)
+    df["End"]   = df["End"].apply(apply_shift)
+    return df
+
+
 def _draw_gantt(ax, sim: pd.DataFrame, all_nodes: list[str], job_color: dict):
     valid = sim.dropna(subset=["Start", "End", "NodeList"]).copy()
     valid = valid[valid["Start"] < valid["End"]]
+    valid = _compress_timeline(valid)
     t_min    = valid["Start"].min()
     node_idx = {n: i for i, n in enumerate(all_nodes)}
 
@@ -222,7 +258,7 @@ def _draw_gantt(ax, sim: pd.DataFrame, all_nodes: list[str], job_color: dict):
 
     ax.set_yticks(range(len(all_nodes)))
     ax.set_yticklabels(all_nodes)
-    ax.set_xlabel("Время с начала, мин")
+    ax.set_xlabel("Время с начала, мин (простои исключены)")
     ax.set_title("Gantt: загрузка нод")
     ax.grid(axis="x", alpha=0.3, linestyle="--")
 

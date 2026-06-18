@@ -213,6 +213,7 @@ def plot_original_data(orig: pd.DataFrame):
     draw_elapsed(ax1, orig)
     draw_log_error(ax2, orig)
     plt.tight_layout()
+    fig.subplots_adjust(top=0.97, hspace=0.18)
     out = PLOTS_DIR / "original_data.png"
     plt.savefig(out, dpi=150)
     plt.close()
