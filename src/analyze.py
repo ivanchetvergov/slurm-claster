@@ -253,10 +253,11 @@ def _draw_gantt(ax, sim: pd.DataFrame, all_nodes: list[str], job_color: dict):
             ax.barh(node_idx[node], e - s, left=s, height=0.5,
                     color=color, alpha=0.88)
 
+    x_max = ax.get_xlim()[1]
+    ax.set_xticks(np.arange(0, x_max + 1, 25))
     ax.set_yticks(range(len(all_nodes)))
     ax.set_yticklabels(all_nodes)
     ax.set_xlabel("Время с начала, мин (простои исключены)")
-    ax.set_title("Gantt: загрузка нод")
     ax.grid(axis="x", alpha=0.3, linestyle="--")
 
 
