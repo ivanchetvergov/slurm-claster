@@ -49,9 +49,6 @@ class JobStats:
     elapsed_gmm_sig1: float
     elapsed_gmm_mu2:  float
     elapsed_gmm_sig2: float
-    log_error_mu: float
-    log_error_sigma: float
-    log_error_clip: float
     log_error_gmm_w:    float   # вес первой компоненты
     log_error_gmm1_mu:  float
     log_error_gmm1_sig: float
@@ -88,7 +85,6 @@ def compute_stats(df: pd.DataFrame) -> JobStats:
     valid = (e_c > 0) & (t_c > 0)
     log_errors_full = np.log(t_c[valid] / e_c[valid])
     log_errors_full = log_errors_full[np.isfinite(log_errors_full)].to_numpy()
-    log_errors = log_errors_full[log_errors_full < LOG_ERROR_CLIP]
 
     le_w, le_mu1, le_sig1, le_mu2, le_sig2 = fit_gmm2(log_errors_full)
 
@@ -102,9 +98,6 @@ def compute_stats(df: pd.DataFrame) -> JobStats:
         elapsed_gmm_sig1=gmm_sig1,
         elapsed_gmm_mu2=gmm_mu2,
         elapsed_gmm_sig2=gmm_sig2,
-        log_error_mu=float(log_errors.mean()),
-        log_error_sigma=float(log_errors.std(ddof=1)),
-        log_error_clip=LOG_ERROR_CLIP,
         log_error_gmm_w=le_w,
         log_error_gmm1_mu=le_mu1,
         log_error_gmm1_sig=le_sig1,

@@ -212,7 +212,8 @@ def _compress_timeline(df: pd.DataFrame, gap_threshold_s: float = 300.0) -> pd.D
     # строим покрытие: когда хоть одна задача работала
     events = sorted(
         [(row["Start"], +1, i) for i, row in df.iterrows()] +
-        [(row["End"],   -1, i) for i, row in df.iterrows()]
+        [(row["End"],   -1, i) for i, row in df.iterrows()],
+        key=lambda x: (x[0], x[1])  # end (-1) раньше start (+1) при одном timestamp
     )
     shift = pd.Timedelta(0)
     active = 0

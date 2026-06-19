@@ -41,8 +41,8 @@ class JobGenerator:
         return np.where(component == 0, le1, le2)
 
     def generate(self, n: int) -> list[JobRequest]:
-        if not 1 <= n <= 999:
-            raise ValueError(f"n должно быть от 1 до 999, получено {n}")
+        if not 1 <= n <= 9999:
+            raise ValueError(f"n должно быть от 1 до 9999, получено {n}")
 
         elapsed   = self._sample_elapsed(n)
         log_error = self._sample_log_error(n)
@@ -50,7 +50,6 @@ class JobGenerator:
         nodes     = self.rng.integers(1, 5, size=n)
 
         elapsed_s   = np.maximum(0.01, np.round(elapsed  / self.time_scale, 2))
-        elapsed_s   = np.minimum(elapsed_s, self.max_seconds)
         timelimit_s = np.maximum(1, np.round(timelimit / self.time_scale).astype(int))
         timelimit_s = np.minimum(timelimit_s, self.max_seconds)
 
