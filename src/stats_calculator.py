@@ -44,12 +44,12 @@ class JobStats:
     elapsed_max: float
     elapsed_mean: float
     elapsed_std: float
-    elapsed_gmm_w:    float  # вес первой компоненты GMM-2 (в log-масштабе)
+    elapsed_gmm_w:    float
     elapsed_gmm_mu1:  float
     elapsed_gmm_sig1: float
     elapsed_gmm_mu2:  float
     elapsed_gmm_sig2: float
-    log_error_gmm_w:    float   # вес первой компоненты
+    log_error_gmm_w:    float
     log_error_gmm1_mu:  float
     log_error_gmm1_sig: float
     log_error_gmm2_mu:  float

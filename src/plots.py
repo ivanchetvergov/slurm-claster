@@ -17,10 +17,10 @@ from data_loader import SlurmDataLoader
 
 _ORANGE_C = "#e87722"
 
-TIMEOUT_FACTOR_MU    = 2.0   # центр модели недооценки TIMEOUT (в разах)
-TIMEOUT_FACTOR_SIGMA = 1.0   # разброс
-TIMEOUT_FACTOR_LO    = 1.2   # нижняя граница: хотя бы в 1.2 раз недооценили
-TIMEOUT_FACTOR_HI    = 5.0   # верхняя граница
+TIMEOUT_FACTOR_MU    = 2.0
+TIMEOUT_FACTOR_SIGMA = 1.0
+TIMEOUT_FACTOR_LO    = 1.2
+TIMEOUT_FACTOR_HI    = 5.0
 
 DATA_DIR  = Path(__file__).parent.parent / "data"
 PLOTS_DIR = Path(__file__).parent.parent / "plots"
@@ -83,7 +83,6 @@ def _set_time_ticks(ax, lo: float, hi: float):
     ax.set_xlabel("Время выполнения")
 
 
-# ── ax-level drawing functions (reusable) ─────────────────────────────────────
 
 def draw_elapsed(ax, orig: pd.DataFrame):
     mask_c = orig["State"].isin(["COMPLETED"]) & (orig["ElapsedRaw"] > 0)
@@ -149,21 +148,20 @@ def draw_log_error(ax, orig: pd.DataFrame):
 
     n_completed = len(log_err)
     n_timeout   = int((orig["State"] == "TIMEOUT").sum())
-    log_err     = np.concatenate([log_err, _timeout_log_errors(n_timeout)])
+    log_err_timeout = _timeout_log_errors(n_timeout)
+    log_err     = np.concatenate([log_err, log_err_timeout])
 
     lo, hi = log_err.min(), log_err.max()
-    data   = log_err
     bins   = np.linspace(lo, hi, 50)
 
-    norm_params = sp.norm.fit(data)
-    ks_n, _     = sp.kstest(data, sp.norm.cdf, args=norm_params)
-    ll_n        = logloss(data, lambda x: sp.norm.pdf(x, *norm_params))
+    norm_params = sp.norm.fit(log_err)
+    ks_n, _     = sp.kstest(log_err, sp.norm.cdf, args=norm_params)
+    ll_n        = logloss(log_err, lambda x: sp.norm.pdf(x, *norm_params))
 
-    gw, gmu1, gs1, gmu2, gs2 = fit_gmm2(data)
-    ks_g, _ = sp.kstest(data, lambda x: gmm_cdf(x, gw, gmu1, gs1, gmu2, gs2))
-    ll_g    = logloss(data, lambda x: gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2))
+    gw, gmu1, gs1, gmu2, gs2 = fit_gmm2(log_err)
+    ks_g, _ = sp.kstest(log_err, lambda x: gmm_cdf(x, gw, gmu1, gs1, gmu2, gs2))
+    ll_g    = logloss(log_err, lambda x: gmm_pdf(x, gw, gmu1, gs1, gmu2, gs2))
 
-    log_err_timeout = _timeout_log_errors(n_timeout)
     c_clipped = log_err[:n_completed]
     t_clipped = log_err_timeout
 

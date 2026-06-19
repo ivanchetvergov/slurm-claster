@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.colors import ListedColormap
 from scipy import stats
-from stats_calculator import compute_stats
-from plots import draw_elapsed, draw_log_error, draw_timeout_model, _set_time_ticks, _timeout_log_errors, _ORANGE_C
+from stats_calculator import compute_stats, fit_gmm2
+from plots import draw_elapsed, draw_log_error, draw_timeout_model, _set_time_ticks, _timeout_log_errors, _ORANGE_C, gmm_pdf
 
 # ── style ─────────────────────────────────────────────────────────────────────
 
@@ -154,7 +154,6 @@ def plot_sampled_data(orig: pd.DataFrame, sim: pd.DataFrame,
     ax1.set_ylabel("Плотность")
     ax1.legend()
 
-    # log_error: берём сэмплированное значение если есть (dry-run), иначе вычисляем
     if "LogError" in sim.columns:
         sim_err = pd.to_numeric(sim["LogError"], errors="coerce").dropna().to_numpy()
     else:
@@ -189,8 +188,6 @@ def plot_sampled_data(orig: pd.DataFrame, sim: pd.DataFrame,
     else:
         ax2.set_title("Log-error")
 
-    from stats_calculator import fit_gmm2
-    from plots import gmm_pdf
     gw, gmu1, gs1, gmu2, gs2 = fit_gmm2(orig_err)
     x2_full = np.linspace(lo2, orig_err.max(), 400)
     ax2.plot(x2_full, gmm_pdf(x2_full, gw, gmu1, gs1, gmu2, gs2), "crimson", lw=2,
@@ -209,18 +206,17 @@ def plot_sampled_data(orig: pd.DataFrame, sim: pd.DataFrame,
 def _compress_timeline(df: pd.DataFrame, gap_threshold_s: float = 300.0) -> pd.DataFrame:
     """Вырезает простои > gap_threshold_s и сдвигает последующие задачи влево."""
     df = df.copy().sort_values("Start")
-    # строим покрытие: когда хоть одна задача работала
     events = sorted(
-        [(row["Start"], +1, i) for i, row in df.iterrows()] +
-        [(row["End"],   -1, i) for i, row in df.iterrows()],
-        key=lambda x: (x[0], x[1])  # end (-1) раньше start (+1) при одном timestamp
+        [(t, +1) for t in df["Start"]] +
+        [(t, -1) for t in df["End"]],
+        key=lambda x: (x[0], x[1])
     )
     shift = pd.Timedelta(0)
     active = 0
     idle_start = None
-    shifts: list[tuple] = []  # (cutoff_time, shift_delta)
+    shifts: list[tuple] = []
 
-    for ts, delta, _ in events:
+    for ts, delta in events:
         if active == 0 and delta == +1 and idle_start is not None:
             gap = (ts - idle_start).total_seconds()
             if gap > gap_threshold_s:
@@ -421,7 +417,7 @@ def plot_slurm_analysis(sim: pd.DataFrame, out: Path):
     gs = GridSpec(3, 2, figure=fig, height_ratios=[0.8, 1.3, 1.3],
                   hspace=0.55, wspace=0.35)
 
-    ax_gantt   = fig.add_subplot(gs[0, :])   # Gantt — весь верхний ряд
+    ax_gantt   = fig.add_subplot(gs[0, :])
     ax_queue   = fig.add_subplot(gs[1, 0])
     ax_scatter = fig.add_subplot(gs[1, 1])
     ax_slow    = fig.add_subplot(gs[2, 0])
@@ -446,12 +442,10 @@ def main():
     sim  = load_sacct(Path(args.sacct))
     orig = load_subsample(Path(args.subsample))
     ref  = compute_stats(orig)
-    mu, sigma = ref.log_error_mu, ref.log_error_sigma
-
     print(f"Загружено из sacct: {len(sim)} записей")
 
     plot_original_data(orig, out_dir / "original_data.png")
-    plot_sampled_data(orig, sim, mu, sigma, args.scale, out_dir / "sampled_data.png")
+    plot_sampled_data(orig, sim, ref.log_error_gmm1_mu, ref.log_error_gmm1_sig, args.scale, out_dir / "sampled_data.png")
     plot_gantt_analysis(sim, out_dir / "gantt_analysis.png")
     plot_slurm_analysis(sim, out_dir / "slurm_analysis.png")
 
