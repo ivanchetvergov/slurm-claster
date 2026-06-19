@@ -32,10 +32,13 @@ class JobGenerator:
 
     def _sample_log_error(self, n: int) -> np.ndarray:
         s = self.stats
+        component = self.rng.choice(2, size=n, p=[s.log_error_gmm_w, 1 - s.log_error_gmm_w])
         a = (LOG_ERROR_LO  - s.log_error_gmm1_mu) / s.log_error_gmm1_sig
         b = (LOG_ERROR_CLIP - s.log_error_gmm1_mu) / s.log_error_gmm1_sig
-        return truncnorm.rvs(a, b, loc=s.log_error_gmm1_mu, scale=s.log_error_gmm1_sig,
-                             size=n, random_state=self.rng)
+        le1 = truncnorm.rvs(a, b, loc=s.log_error_gmm1_mu, scale=s.log_error_gmm1_sig,
+                            size=n, random_state=self.rng)
+        le2 = self.rng.normal(s.log_error_gmm2_mu, s.log_error_gmm2_sig, n)
+        return np.where(component == 0, le1, le2)
 
     def generate(self, n: int) -> list[JobRequest]:
         if not 1 <= n <= 999:
