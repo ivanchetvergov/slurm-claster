@@ -1,6 +1,6 @@
 UID    = 50109
 JOB    = sphere.slrm
-N      = 30
+N      = 200
 SCALE    = 2000
 PART     = debug
 SEED     = 42
