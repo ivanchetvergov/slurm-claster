@@ -371,24 +371,26 @@ def _wait_time(ax, sim: pd.DataFrame):
     ax.set_title("Время ожидания (по порядку отправки)")
 
 
-def _scatter_nodes_wait(ax, sim: pd.DataFrame):
-    valid = sim.dropna(subset=["Submit", "Start", "ReqNodes"]).copy()
-    valid = valid[valid["ReqNodes"] > 0]
+def _wait_cdf(ax, sim: pd.DataFrame):
+    valid = sim.dropna(subset=["Submit", "Start"]).copy()
     wait  = (valid["Start"] - valid["Submit"]).dt.total_seconds() / 60
-    nodes = valid["ReqNodes"].astype(int)
-    rng   = np.random.default_rng(42)
-    jitter = rng.uniform(-0.15, 0.15, len(nodes))
+    wait  = np.sort(wait.to_numpy())
+    cdf   = np.arange(1, len(wait) + 1) / len(wait)
 
-    ax.scatter(nodes + jitter, wait, alpha=0.7, s=50, color=_BLUE, edgecolors="white", lw=0.5)
+    ax.plot(wait, cdf, color=_BLUE, lw=2)
+    ax.fill_between(wait, cdf, alpha=0.12, color=_BLUE)
 
-    for n in sorted(nodes.unique()):
-        m = wait[nodes == n].mean()
-        ax.hlines(m, n - 0.35, n + 0.35, colors=_ORANGE, lw=2)
+    for p, ls in [(0.5, "--"), (0.8, ":"), (0.95, "-.")]:
+        idx = np.searchsorted(cdf, p)
+        if idx < len(wait):
+            ax.axvline(wait[idx], color=_ORANGE, lw=1.2, ls=ls,
+                       label=f"p{int(p*100)}={wait[idx]:.0f} мин")
 
-    ax.set_xticks(sorted(nodes.unique()))
-    ax.set_xlabel("Запрошено нод")
-    ax.set_ylabel("Ожидание, мин")
-    ax.set_title("Ожидание vs число нод  (— среднее)")
+    ax.set_xlabel("Время ожидания, мин")
+    ax.set_ylabel("Доля джобов")
+    ax.set_ylim(0, 1.05)
+    ax.set_title("CDF времени ожидания")
+    ax.legend(fontsize=9, framealpha=0.8)
 
 
 def _timelimit_efficiency(ax, sim: pd.DataFrame):
@@ -422,7 +424,7 @@ def plot_slurm_analysis(sim: pd.DataFrame, out: Path):
     ax_eff     = fig.add_subplot(gs[1, 1])
 
     _queue_depth(ax_queue, sim)
-    _scatter_nodes_wait(ax_scatter, sim)
+    _wait_cdf(ax_scatter, sim)
     _wait_time(ax_slow, sim)
     _timelimit_efficiency(ax_eff, sim)
 
