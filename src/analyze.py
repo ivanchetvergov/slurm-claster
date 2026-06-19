@@ -361,8 +361,11 @@ def _wait_time(ax, sim: pd.DataFrame):
     x     = range(len(wait))
 
     ax.bar(x, wait, color=_BLUE, alpha=0.75, width=0.6)
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(valid["JobID"].astype(str), rotation=45, ha="right", fontsize=7)
+    if len(wait) <= 30:
+        ax.set_xticks(list(x))
+        ax.set_xticklabels(valid["JobID"].astype(str), rotation=45, ha="right", fontsize=7)
+    else:
+        ax.set_xticks([])
     ax.set_ylabel("Ожидание, мин")
     ax.set_title("Время ожидания (по порядку отправки)")
 
@@ -397,33 +400,26 @@ def _timelimit_efficiency(ax, sim: pd.DataFrame):
     ax.axhline(100, color="crimson", lw=1, ls="--", alpha=0.7)
     ax.set_ylabel("Использовано, %")
     ax.set_title("Сколько задача использовала от выделенного времени, %")
-    ax.set_xticks(range(len(valid)))
-    ax.set_xticklabels(valid["JobID"].astype(str), rotation=45, ha="right", fontsize=7)
-    ax.set_xlabel("Job ID")
+    if len(valid) <= 30:
+        ax.set_xticks(range(len(valid)))
+        ax.set_xticklabels(valid["JobID"].astype(str), rotation=45, ha="right", fontsize=7)
+        ax.set_xlabel("Job ID")
+    else:
+        ax.set_xticks([])
 
 
 def plot_slurm_analysis(sim: pd.DataFrame, out: Path):
     from matplotlib.gridspec import GridSpec
 
-    all_nodes = _all_nodes(sim)
-    valid     = sim.dropna(subset=["Start", "End", "NodeList"]).copy()
-    valid     = valid[valid["Start"] < valid["End"]]
-    job_ids   = sorted(valid["JobID"].unique())
-    cmap_src  = plt.cm.tab20 if len(job_ids) > 10 else plt.cm.tab10
-    job_color = {jid: cmap_src(i / max(len(job_ids), 10)) for i, jid in enumerate(job_ids)}
-
-    fig = plt.figure(figsize=(16, 12))
+    fig = plt.figure(figsize=(16, 9))
     fig.suptitle("Анализ работы SLURM", fontsize=14, y=0.98)
-    gs = GridSpec(3, 2, figure=fig, height_ratios=[0.8, 1.3, 1.3],
-                  hspace=0.55, wspace=0.35)
+    gs = GridSpec(2, 2, figure=fig, hspace=0.50, wspace=0.35)
 
-    ax_gantt   = fig.add_subplot(gs[0, :])
-    ax_queue   = fig.add_subplot(gs[1, 0])
-    ax_scatter = fig.add_subplot(gs[1, 1])
-    ax_slow    = fig.add_subplot(gs[2, 0])
-    ax_eff     = fig.add_subplot(gs[2, 1])
+    ax_queue   = fig.add_subplot(gs[0, 0])
+    ax_scatter = fig.add_subplot(gs[0, 1])
+    ax_slow    = fig.add_subplot(gs[1, 0])
+    ax_eff     = fig.add_subplot(gs[1, 1])
 
-    _draw_gantt(ax_gantt, sim, all_nodes, job_color)
     _queue_depth(ax_queue, sim)
     _scatter_nodes_wait(ax_scatter, sim)
     _wait_time(ax_slow, sim)
